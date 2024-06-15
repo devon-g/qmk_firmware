@@ -27,8 +27,8 @@ enum layers {
 };
 
 enum custom_keycodes {
-    DF_QWERTY = SAFE_RANGE,
-    DF_DVORAK
+    KC_QWERTY = SAFE_RANGE,
+    KC_DVORAK
 };
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
@@ -85,7 +85,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   //,-----------------------------------------------------.                    ,-----------------------------------------------------.
       QK_BOOT, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,                      XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,
   //|--------+--------+--------+--------+--------+--------|                    |--------+--------+--------+--------+--------+--------|
-      RGB_TOG, RGB_HUI, RGB_SAI, RGB_VAI, XXXXXXX, XXXXXXX,                      XXXXXXX, DF_QWERTY, DF_DVORAK, XXXXXXX, XXXXXXX, XXXXXXX,
+      RGB_TOG, RGB_HUI, RGB_SAI, RGB_VAI, XXXXXXX, XXXXXXX,                      XXXXXXX, KC_QWERTY, KC_DVORAK, XXXXXXX, XXXXXXX, XXXXXXX,
   //|--------+--------+--------+--------+--------+--------|                    |--------+--------+--------+--------+--------+--------|
       RGB_MOD, RGB_HUD, RGB_SAD, RGB_VAD, XXXXXXX, XXXXXXX,                      XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,
   //|--------+--------+--------+--------+--------+--------+--------|  |--------+--------+--------+--------+--------+--------+--------|
@@ -129,7 +129,6 @@ static void render_logo(void) {
 
 /* timers */
 uint32_t anim_timer = 0;
-uint32_t anim_sleep = 0;
 
 /* current frame */
 uint8_t current_frame = 0;
@@ -141,7 +140,6 @@ led_t led_usb_state;
 bool isSneaking = false;
 bool isJumping  = false;
 bool showedJump = true;
-bool isBarking = false;
 
 /* logic */
 static void render_luna(int LUNA_X, int LUNA_Y) {
@@ -238,57 +236,60 @@ static void render_luna(int LUNA_X, int LUNA_Y) {
         }
     }
 
+#   if OLED_TIMEOUT > 0
+    /* the animation prevents the normal timeout from occuring */
+    if (last_input_activity_elapsed() > OLED_TIMEOUT && last_led_activity_elapsed() > OLED_TIMEOUT) {
+        oled_off();
+        return;
+    } else {
+        oled_on();
+    }
+#   endif
+
     /* animation timer */
     if (timer_elapsed32(anim_timer) > ANIM_FRAME_DURATION) {
         anim_timer = timer_read32();
         animate_luna();
-    }
-
-    /* this fixes the screen on and off bug */
-    if (current_wpm > 0) {
-        oled_on();
-        anim_sleep = timer_read32();
-    } else if(timer_elapsed32(anim_sleep) > OLED_TIMEOUT) {
-        /* clear */
-        oled_set_cursor(0,0);
-        oled_write("                                                                                                    ", false);
-        oled_off();
-        oled_set_cursor(LUNA_X,LUNA_Y);
     }
 }
 /* KEYBOARD PET END */
 
 static void print_logo_narrow(void) {
     render_logo();
+
     if (current_wpm > 0) {
-        anim_sleep = timer_read32();
         /* wpm counter */
         oled_set_cursor(0, 14);
         oled_write(get_u8_str(get_current_wpm(), '0'), false);
 
         oled_set_cursor(0, 15);
         oled_write(" wpm", false);
-
-    /* this fixes the screen on and off bug */
-    } else if (timer_elapsed32(anim_sleep) > OLED_TIMEOUT) {
-        /* clear */
-        oled_set_cursor(0,0);
-        oled_write("                                                                                                                        ", false);
-        oled_off();
     }
 }
 
 static void print_status_narrow(void) {
+    oled_set_cursor(0, 0);
+    switch (get_highest_layer(default_layer_state)) {
+        case _QWERTY:
+            oled_write("QWRTY", false);
+            break;
+        case _DVORAK:
+            oled_write("DVRAK", false);
+            break;
+        default:
+            oled_write("?????", false);
+            break;
+    }
+
+    oled_set_cursor(0, 5);
     oled_write("LAYER", false);
 
     oled_set_cursor(0, 6);
-
     switch (get_highest_layer(layer_state)) {
         case _QWERTY:
-            oled_write("qw   ", false);
-            break;
         case _DVORAK:
-            oled_write("dv   ", false);
+            oled_write("base ", false);
+            break;
         case _LOWER:
             oled_write("lower", false);
             break;
@@ -302,11 +303,11 @@ static void print_status_narrow(void) {
             oled_write("?????", false);
     }
 
+    oled_set_cursor(0, 8);
+    oled_write("CPSLK", led_usb_state.caps_lock);
 
     /* KEYBOARD PET RENDER START */
-
     render_luna(0, 13);
-
     /* KEYBOARD PET RENDER END */
 }
 
@@ -314,7 +315,7 @@ oled_rotation_t oled_init_user(oled_rotation_t rotation) { return OLED_ROTATION_
 
 bool oled_task_user(void) {
     /* KEYBOARD PET VARIABLES START */
-    current_wpm   = get_current_wpm();
+    current_wpm = get_current_wpm();
     led_usb_state = host_keyboard_led_state();
     /* KEYBOARD PET VARIABLES END */
 
@@ -335,19 +336,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             break;
         case KC_SPC:
             isJumping = record->event.pressed;
-            if (isJumping) {
+            if (isJumping)
                 showedJump = false;
-            }
-            break;
-        case KC_CAPS:
-            isBarking = record->event.pressed;
             break;
         /* KEYBOARD PET STATUS END */
-        case DF_DVORAK:
+        case KC_DVORAK:
             if (record->event.pressed)
                 set_single_persistent_default_layer(_DVORAK);
             break;
-        case DF_QWERTY:
+        case KC_QWERTY:
             if (record->event.pressed)
                 set_single_persistent_default_layer(_QWERTY);
             break;
