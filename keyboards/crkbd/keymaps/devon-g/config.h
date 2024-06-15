@@ -44,9 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // RGB Matrix Animation modes. Explicitly enabled
 // For full list of effects, see:
-// https://docs.qmk.fm/#/feature_rgb_matrix?id=rgb-matrix-effects
-  #define ENABLE_RGB_MATRIX_ALPHAS_MODS
-  #define ENABLE_RGB_MATRIX_CYCLE_UP_DOWN
+// https://github.com/qmk/qmk_firmware/blob/master/docs/features/rgb_matrix.md#rgb-matrix-effects-rgb-matrix-effects
 #endif
 
 #define OLED_FONT_H "keyboards/crkbd/lib/glcdfont.c"
@@ -56,4 +54,3 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SPLIT_OLED_ENABLE
 
 #define NO_ACTION_ONESHOT
-#define NO_ACTION_TAPPING
